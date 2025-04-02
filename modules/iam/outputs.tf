@@ -1,0 +1,9 @@
+output "session_dsm_access_key" {
+  value     = aws_iam_access_key.session_dsm.id
+  sensitive = true
+}
+
+output "session_dsm_secret_key" {
+  value     = aws_iam_access_key.session_dsm.secret
+  sensitive = true
+}
