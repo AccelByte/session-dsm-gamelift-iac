@@ -20,7 +20,9 @@ resource "aws_sqs_queue_policy" "sqs_policy" {
     Statement = [
       {
         Effect    = "Allow"
-        Principal = "*"
+        Principal = {
+          Service = "events.amazonaws.com"
+        },
         Action    = "SQS:SendMessage"
         Resource  = aws_sqs_queue.queue.arn
       },

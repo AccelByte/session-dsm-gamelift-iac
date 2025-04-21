@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"strings"
 
 	"github.com/AccelByte/accelbyte-go-sdk/services-api/pkg/factory"
 	"github.com/AccelByte/accelbyte-go-sdk/services-api/pkg/repository"
@@ -34,9 +33,10 @@ const (
 	DsStatusFailedToRequest = "FAILED_TO_REQUEST"
 
 	// Terraform-defined constants
-	SsmParamNameBaseUrl      = "/lambda/ab_base_url"
-	SsmParamNameClientId     = "/lambda/ab_client_id"
-	SsmParamNameClientSecret = "/lambda/ab_client_secret"
+	SsmParamNameBaseUrl       = "/lambda/ab_base_url"
+	SsmParamNameClientId      = "/lambda/ab_client_id"
+	SsmParamNameClientSecret  = "/lambda/ab_client_secret"
+	SsmParamNameNamespaceName = "/lambda/ab_namespace_name"
 )
 
 // See https://docs.aws.amazon.com/gamelift/latest/developerguide/queue-events.html
@@ -55,26 +55,18 @@ type GameLiftEventDetail struct {
 	PlacedPlayerSessions []any  `json:"placedPlayerSessions,omitempty"`
 }
 
-func getAccelByteCredentialsFromSsm(ctx context.Context) (repository.ConfigRepository, error) {
-	// For security, we store SSM parameter keys in env vars then fetch them from SSM
-	awsConfig, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		log.Printf("Error loading AWS config: %v", err)
-		return nil, err
-	}
-	awsSsmClient := ssm.NewFromConfig(awsConfig)
-
-	accelByteBaseUrl, err := getParamFromSsm(ctx, awsSsmClient, SsmParamNameBaseUrl)
+func getAccelByteCredentialsFromSsm(ctx context.Context, ssmClient *ssm.Client) (repository.ConfigRepository, error) {
+	accelByteBaseUrl, err := getParamFromSsm(ctx, ssmClient, SsmParamNameBaseUrl)
 	if err != nil {
 		return nil, err
 	}
 
-	accelByteClientId, err := getParamFromSsm(ctx, awsSsmClient, SsmParamNameClientId)
+	accelByteClientId, err := getParamFromSsm(ctx, ssmClient, SsmParamNameClientId)
 	if err != nil {
 		return nil, err
 	}
 
-	accelByteClientSecret, err := getParamFromSsm(ctx, awsSsmClient, SsmParamNameClientSecret)
+	accelByteClientSecret, err := getParamFromSsm(ctx, ssmClient, SsmParamNameClientSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -131,9 +123,21 @@ func getAccelByteGameSessionService(configRepo repository.ConfigRepository) (*se
 
 func main() {
 	lambda.Start(func(ctx context.Context, sqsEvent events.SQSEvent) error {
-		accelByteCredentials, err := getAccelByteCredentialsFromSsm(ctx)
+		awsConfig, err := config.LoadDefaultConfig(ctx)
+		if err != nil {
+			log.Printf("Error loading AWS config: %v", err)
+			return err
+		}
+		awsSsmClient := ssm.NewFromConfig(awsConfig)
+
+		accelByteCredentials, err := getAccelByteCredentialsFromSsm(ctx, awsSsmClient)
 		if err != nil {
 			log.Printf("Error getting Accelbyte credentials from SSM: %v", err)
+			return err
+		}
+
+		accelByteNamespace, err := getParamFromSsm(ctx, awsSsmClient, SsmParamNameNamespaceName)
+		if err != nil {
 			return err
 		}
 
@@ -170,13 +174,6 @@ func main() {
 				log.Printf("Skipping event with invalid detail JSON: %v", eventBridgeEvent.Detail)
 				continue
 			}
-
-			queueArn := eventBridgeEvent.Resources[0]
-			queueArnSplit := strings.Split(queueArn, "/")
-			queueName := queueArnSplit[len(queueArnSplit)-1]
-
-			// This example assumes that your GameLift Game Session Queue name exactly matches your AccelByte Namespace ID
-			accelByteNamespace := queueName
 
 			getSessionInput := &game_session.GetGameSessionParams{
 				Context:     ctx,

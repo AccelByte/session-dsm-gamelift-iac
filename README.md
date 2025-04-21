@@ -1,30 +1,34 @@
-# Infrastructure-as-Code for Supporting GameLift Servers Queues
+# Infrastructure-as-Code for Supporting Amazon GameLift Servers Queues
 
-GameLift Servers offers a robust queue system, which can be used to place game sessions on fleets dynamically based on location, latency, and cost. When using queues, AccelByte Gaming Services (AGS) must be informed when a queue placement completes. GameLift Servers emits session placement events automatically through Amazon EventBridge, which can be handled through an AWS Lambda to inform AccelByte about the status of the session placement.
+Amazon GameLift Servers offers a robust queue system, which can be used to place game sessions on fleets dynamically based on location, latency, and cost. When using queues, AccelByte Gaming Services (AGS) must be informed when a queue placement completes. Amazon GameLift Servers emits session placement events automatically through Amazon EventBridge, which can be handled through an AWS Lambda to inform AccelByte about the status of the session placement.
 
-This repo provides the setup needed to integrate AccelByte and GameLift Servers. It defines EventBridge rules to place matching events onto an SQS queue, and defines a Lambda to process events that have been placed on the SQS queue.
+This repo provides the setup needed to integrate AccelByte and Amazon GameLift Servers. It defines EventBridge rules to place matching events onto an SQS queue, and defines a Lambda to process events that have been placed on the SQS queue.
 
 ## Lambda
 
 The Lambda code is provided in this repo under the `lambda` directory. The Lambda reads events from the SQS queue and, for each event, uses the AccelByte SDK to inform AGS of the status of the session placement using UpdateDSInformation.
 
-Note that for testing purposes, the Lambda assumes that the GameLift Queue name exactly matches the AccelByte namespace. To support multiple queues, you may wish to design a queue naming convention that includes the AccelByte namespace and modify the Lambda.
+The Lambda is capable of handling both successful and failed session placements, though it is only used for failed placements in this integration. Successful placements are expected to call UpdateDSInformation from the dedicated server in response to getting the OnStartGameSession notification from Amazon GameLift Servers.
 
-The Lambda is capable of handling both successful and failed session placements, though it is only used for failed placements in this integration. Successful placements are expected to call UpdateDSInformation from the dedicated server in response to getting the OnStartGameSession notification from GameLift.
+> [!NOTE]
+> For testing purposes, the Lambda assumes that the queue name exactly matches the AccelByte namespace. To support multiple queues, you may wish to design a queue naming convention that includes the AccelByte namespace and modify the Lambda to support your naming convension
+
+> [!NOTE]  
+> You must build the Lambda with the provided `build.sh` script before running `terraform apply`. Failing to do so will cause the `terraform apply` command to fail.
 
 ## Modules
 
 ### IAM
 
-The `iam` module defines a set of credentials that are preconfigured to have the permissions needed by the Session DSM to manage GameLift Servers game sessions. These permissions include listing aliases, creating game sessions, terminating game sessions, starting session placements, and stopping session placements.
+The `iam` module defines a set of credentials that are preconfigured to have the permissions needed by the Session DSM to manage Amazon GameLift Servers game sessions. These permissions include listing aliases, creating game sessions, terminating game sessions, starting session placements, and stopping session placements.
 
-These credentials can be retrieved by running `terraform output session_dsm_access_key` and `terraform output session_dsm_secret_key` after `terraform apply`. For more information about how to configure the Session DSM using these credentials, refer to the QUICKSTART guide.
+These credentials can be retrieved by running `terraform output gamelift_aws_access_key` and `terraform output gamelift_aws_secret_key` after `terraform apply`. For more information about how to configure the Session DSM using these credentials, refer to the QUICKSTART guide.
 
 ### EventBridge
 
-The `eventbridge` module handles the creation of an AWS EventBridge rule that is responsible for filtering and routing certain GameLift events to SQS for processing. 
+The `eventbridge` module handles the creation of an AWS EventBridge rule that is responsible for filtering and routing certain events to SQS for processing. 
 
-GameLift Servers will automatically post events to EventBridge by default, and including queue placement events. By default, it will send events about pending, failed, and succeeded queue placements. For this integration, we only want the Lambda to process failed queue placements, we apply a filter to only process events of type `PlacementFailed`, `PlacementTimedOut`, and `PlacementCancelled`. A list of game session placement events is available in the [Amazon GameLift Servers Hosting Guide](https://docs.aws.amazon.com/gamelift/latest/developerguide/queue-events.html).
+Amazon GameLift Servers will automatically post events to EventBridge by default, and including queue placement events. By default, it will send events about pending, failed, and succeeded queue placements. For this integration, we only want the Lambda to process failed queue placements, we apply a filter to only process events of type `PlacementFailed`, `PlacementTimedOut`, and `PlacementCancelled`. A list of game session placement events is available in the [Amazon GameLift Servers Hosting Guide](https://docs.aws.amazon.com/gamelift/latest/developerguide/queue-events.html).
 
 This module also defines a routing rule to place matching events onto the SQS queue, where they can be processed by the Lambda later. A list of all supported EventBridge targets can be found in the [Amazon EventBridge User Guide](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-targets.html).
 
@@ -47,7 +51,7 @@ Once you have applied the Terraform configuration to your AWS account, you can n
 
 The Lambda uses the AccelByte Golang SDK, which can be found [here](https://github.com/AccelByte/accelbyte-go-sdk). Specifically, it makes the call to `UpdateDSInformation`, which can be found in the AccelByte API Explorer [here](https://docs.accelbyte.io/api-explorer/#Session/adminUpdateDSInformation). An example is provided in the AccelByte Golang SDK [here](https://github.com/AccelByte/accelbyte-go-sdk/blob/2abb6fb0bd663b85b687bc8122bb1aab5aa7940e/samples/cli/cmd/session/gameSession/adminUpdateDSInformation.go).
 
-For more information about GameLift Queues, refer to the official GameLift Servers Developer Guides:
+For more information about Amazon GameLift Servers Queues, refer to the official Developer Guides:
 
 - [Managing game session placement with Amazon GameLift Servers queues](https://docs.aws.amazon.com/gamelift/latest/developerguide/queues-intro.html)
 - [Set up event notification for game session placement](https://docs.aws.amazon.com/gamelift/latest/developerguide/queue-notification.html)
