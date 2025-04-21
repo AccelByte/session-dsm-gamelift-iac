@@ -11,7 +11,7 @@ The Lambda code is provided in this repo under the `lambda` directory. The Lambd
 The Lambda is capable of handling both successful and failed session placements, though it is only used for failed placements in this integration. Successful placements are expected to call UpdateDSInformation from the dedicated server in response to getting the OnStartGameSession notification from Amazon GameLift Servers.
 
 > [!NOTE]
-> For testing purposes, the Lambda assumes that the queue name exactly matches the AccelByte namespace. To support multiple queues, you may wish to design a queue naming convention that includes the AccelByte namespace and modify the Lambda to support your naming convension
+> For testing purposes, the Lambda only supports a single AccelByte namespace, as defined in the AWS SSM variable `/lambda/ab_namespace_name`. To support multiple namespaces and queues, you may wish to design a queue naming convention that includes the AccelByte namespace and modify the Lambda to support your naming convension.
 
 > [!NOTE]  
 > You must build the Lambda with the provided `build.sh` script before running `terraform apply`. Failing to do so will cause the `terraform apply` command to fail.
@@ -43,7 +43,7 @@ The `lambda` module defines the creation of the Lambda resource in AWS. Many of 
 
 ### SSM
 
-The Lambda needs AccelByte credentials so that it can use the AccelByte SDK to make the UpdateDSInformation call. The preferred way to configure this is by adding Amazon Systems Manager Parameter Store. In the Terraform repo, three variables are configured: `/lambda/ab_base_url`, `/lambda/ab_client_id`, and `/lambda/ab_client_secret`.
+The Lambda needs AccelByte credentials so that it can use the AccelByte SDK to make the UpdateDSInformation call. The preferred way to configure this is by adding Amazon Systems Manager Parameter Store. In the Terraform repo, three variables are configured: `/lambda/ab_base_url`, `/lambda/ab_client_id`, `/lambda/ab_client_secret`, and `/lambda/ab_namespace_name`.
 
 Once you have applied the Terraform configuration to your AWS account, you can navigate to the [AWS SSM Parameter Store](https://us-west-2.console.aws.amazon.com/systems-manager/parameters?region=us-west-2&tab=Table#), and fill in the parameters. You will need to create AccelByte credentials with Session READ and UPDATE permissions. If using `Shared Cloud` tier, the IAM client will need `Session` → `Game Session` → read and update permissions. If using `Private Cloud` tier, the IAM client will need the `NAMESPACE:{namespace}:SESSION:GAME [READ]` and `ADMIN:NAMESPACE:{namespace}:SESSION:GAME [UPDATE]` permissions.
 
