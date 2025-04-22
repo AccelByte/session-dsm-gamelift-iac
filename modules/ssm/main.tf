@@ -30,3 +30,14 @@ resource "aws_ssm_parameter" "ab_client_secret" {
     ignore_changes = [value]
   }
 }
+
+resource "aws_ssm_parameter" "ab_namespace_name" {
+  name        = "/lambda/ab_namespace_name"
+  description = "AccelByte Namespace Name"
+  type        = "String"
+  value       = "placeholder"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
